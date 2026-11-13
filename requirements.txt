@@ -1,0 +1,28 @@
+# Core Deep Learning Framework
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Segmentation Architectures & Pretrained Encoders
+segmentation-models-pytorch>=0.3.3
+
+# Medical Imaging & Image Processing
+pydicom>=2.4.0
+opencv-python>=4.8.0
+scikit-image>=0.21.0
+Pillow>=10.0.0
+
+# Augmentation & Scientific Computing
+albumentations>=1.3.1
+scipy>=1.11.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Configuration & Utilities
+pyyaml>=6.0
+tqdm>=4.65.0
+matplotlib>=3.7.0
+
+# Testing & Reproducibility
+pytest>=7.4.0
+

@@ -1,0 +1,90 @@
+# ==========================================
+# Datasets & Medical Imaging Data (DO NOT PUSH)
+# ==========================================
+INbreast_complete/
+INbreast_complete*/
+data/
+*.dcm
+*.roi
+*.pdf
+*.xls
+*.xlsx
+
+# Cache and large artifacts
+*.npz
+*.npy
+data/cache/
+
+# ==========================================
+# Model Weights, Checkpoints & Outputs
+# ==========================================
+checkpoints/
+*.pth
+*.pt
+*.onnx
+*.bin
+*.tar.gz
+
+# Generated run outputs (metrics, visualizations, logs)
+debug_overlays/
+visualizations/
+results/
+runs/
+*.log
+
+# ==========================================
+# Python & Bytecode Artifacts
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+.hypothesis/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env
+ENV/
+env.bak/
+venv.bak/
+
+# ==========================================
+# Editor & OS Artifacts
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
