@@ -1,30 +1,32 @@
-# INbreast Lesion Segmentation Configuration
+# INbreast lesion segmentation. The same data, loss, optimizer, scheduler,
+# and epoch budget are used for U-Net, Attention U-Net, and DeepLabV3.
 
 data:
-  # Raw data locations
   dicom_dir: "INbreast_complete/AllDICOMs"
   xml_dir: "INbreast_complete/AllXML"
   csv_path: "INbreast_complete/INbreast.csv"
   pectoral_xml_dir: "INbreast_complete/PectoralMuscle/Pectoral Muscle XML"
-  
-  # Offline preprocessed cache directory (accelerates training)
+
   cache_dir: "data/cache"
   use_cache: true
 
-  # Target configuration: "mass" (Mass + Spiculated Region) or "calcification" (Calcification + Cluster)
+  # "mass" = Mass ROIs only. "mass_spiculated" also keeps Spiculated Region.
+  # "calcification" = Calcification + Cluster. Pectoral muscle is never painted.
   target: "mass"
 
-  # Image dimensions and preprocessing
   image_size: 512
   percentile_clip: [0.5, 99.5]
   normalize_imagenet: true
   flip_right_breasts: true
   exclude_pectoral_muscle: false
 
-  # Negative (empty mask) sampling ratio relative to positive samples (e.g. 1.0 means 1:1, or -1 for all negatives)
+  # Train only. Resampled every epoch with data.seed (no model name in the seed).
+  # Val and test always keep every image. -1 keeps every training negative.
   negative_ratio: 1.0
 
-  # Cross-validation settings (Patient-grouped stratified 5-fold)
+  # mm/pixel when a DICOM has neither PixelSpacing nor ImagerPixelSpacing.
+  fallback_spacing_mm: 0.070
+
   splits_path: "splits.json"
   n_splits: 5
   seed: 42
@@ -46,16 +48,24 @@ training:
   batch_size: 8
   num_workers: 4
   epochs: 100
+  min_epochs: 20
   patience: 15
-  
-  # Differential learning rates (encoder vs decoder/head)
+  early_stop_window: 3
+
+  # "cosine_warmup" or "plateau". Both groups share this schedule.
+  scheduler: "cosine_warmup"
+  warmup_epochs: 5
+  cosine_final_ratio: 0.01
+  plateau_factor: 0.5
+  plateau_patience: 5
+  min_lr: 1.0e-6
+
   encoder_lr: 0.0001
   decoder_lr: 0.001
   weight_decay: 0.0001
   grad_clip: 1.0
   mixed_precision: true
 
-  # Loss function settings: "dice_bce", "focal", or "tversky"
   loss_type: "dice_bce"
   dice_weight: 1.0
   bce_weight: 1.0
@@ -64,15 +74,20 @@ training:
   tversky_alpha: 0.7
   tversky_beta: 0.3
 
-  # Device: "cuda" or "cpu"
   device: "cuda"
 
 evaluation:
   lesion_iou_threshold: 0.2
+  lesion_iou_threshold_strict: 0.5
   threshold_search_start: 0.1
   threshold_search_end: 0.9
   threshold_search_step: 0.05
-  debug_overlay_dir: "debug_overlays"
+  min_component_sizes: [0, 16, 32, 64, 128, 256]
+  nsd_tolerances_mm: [1.0, 2.0]
+  froc_threshold_start: 0.02
+  froc_threshold_end: 0.98
+  froc_threshold_step: 0.02
+  bootstrap_resamples: 10000
   results_dir: "results"
   visualizations_dir: "visualizations"
-
+  debug_overlay_dir: "debug_overlays"

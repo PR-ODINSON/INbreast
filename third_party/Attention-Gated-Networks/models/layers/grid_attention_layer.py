@@ -77,14 +77,15 @@ class GridAttentionBlock2D(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
+        # Upstream commit eee4881: kaiming_normal fan_in; BN normal(1.0, 0.02).
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                nn.init.normal_(m.weight, 1.0, 0.02)
+                nn.init.constant_(m.bias, 0.0)
 
     def forward(self, x: torch.Tensor, g: torch.Tensor, return_attention: bool = False):
         """

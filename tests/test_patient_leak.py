@@ -1,60 +1,93 @@
+"""3-way patient-level leak test for nested 5-fold splits.
+
+Checks:
+  - train ∩ val = ∅
+  - train ∩ test = ∅
+  - val  ∩ test = ∅
+  - Every patient appears in TEST exactly once across all 5 folds.
+"""
+
+import json
 import os
 import sys
-import json
+
 import yaml
-try:
-    import pytest
-except ImportError:
-    pytest = None
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.dataset import build_patient_stratified_splits
 
 
 def test_patient_leak_in_splits():
-    """
-    Hard Rule Test:
-    Asserts zero patient leakage between train and validation sets across all 5 folds.
-    """
     config_path = "config.yaml"
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     splits_path = config["data"].get("splits_path", "splits.json")
     if not os.path.exists(splits_path):
         splits_data = build_patient_stratified_splits(config, output_path=splits_path)
     else:
-        with open(splits_path, "r") as f:
+        with open(splits_path, "r", encoding="utf-8") as f:
             splits_data = json.load(f)
+
+    scheme = splits_data.get("scheme", "")
+    assert "nested" in scheme, (
+        f"splits.json scheme='{scheme}' is not nested. Regenerate with src/dataset.py."
+    )
 
     folds = splits_data["folds"]
     assert len(folds) == 5, f"Expected 5 folds, got {len(folds)}"
 
-    all_val_patients = []
+    all_test_patients = []
+
     for fold_name, fold_info in folds.items():
+        for key in ("train_patients", "val_patients", "test_patients",
+                    "train_samples", "val_samples", "test_samples"):
+            assert key in fold_info, f"{fold_name} missing '{key}'"
+
         train_pats = set(fold_info["train_patients"])
-        val_pats = set(fold_info["val_patients"])
+        val_pats   = set(fold_info["val_patients"])
+        test_pats  = set(fold_info["test_patients"])
 
-        # Core assertion: Train and Val sets must be completely disjoint
-        intersection = train_pats.intersection(val_pats)
-        assert len(intersection) == 0, (
-            f"CRITICAL LEAKAGE in {fold_name}: {len(intersection)} patients appear in both "
-            f"train and val sets! Patients: {intersection}"
-        )
+        # 3-way partition at patient level
+        assert train_pats & val_pats  == set(), f"{fold_name}: train∩val={train_pats & val_pats}"
+        assert train_pats & test_pats == set(), f"{fold_name}: train∩test={train_pats & test_pats}"
+        assert val_pats  & test_pats  == set(), f"{fold_name}: val∩test={val_pats & test_pats}"
 
-        all_val_patients.extend(fold_info["val_patients"])
+        # Sample-level (each sample's patient_id must be in the right partition)
+        def _check_samples(samples, allowed, label):
+            bad = {s["patient_id"] for s in samples if s["patient_id"] not in allowed}
+            assert not bad, f"{fold_name} {label} samples contain alien patients: {bad}"
 
-        # Assert no sample in val has a patient in train
-        val_sample_patients = {s["patient_id"] for s in fold_info["val_samples"]}
-        train_sample_patients = {s["patient_id"] for s in fold_info["train_samples"]}
-        sample_intersection = train_sample_patients.intersection(val_sample_patients)
-        assert len(sample_intersection) == 0, (
-            f"CRITICAL SAMPLE LEAKAGE in {fold_name}: {sample_intersection}"
-        )
+        _check_samples(fold_info["train_samples"], train_pats, "train")
+        _check_samples(fold_info["val_samples"],   val_pats,   "val")
+        _check_samples(fold_info["test_samples"],  test_pats,  "test")
 
-    # Assert every patient is evaluated in exactly one validation fold
-    assert len(all_val_patients) == len(set(all_val_patients)), "Some patients appear in multiple validation folds!"
-    print(f"\n[PASS] Verified zero patient leakage across all 5 folds. Total unique patients: {len(set(all_val_patients))}")
+        # Cross-partition sample leakage
+        train_sp = {s["patient_id"] for s in fold_info["train_samples"]}
+        val_sp   = {s["patient_id"] for s in fold_info["val_samples"]}
+        test_sp  = {s["patient_id"] for s in fold_info["test_samples"]}
+        assert train_sp & val_sp  == set(), f"{fold_name}: sample train∩val"
+        assert train_sp & test_sp == set(), f"{fold_name}: sample train∩test"
+        assert val_sp  & test_sp  == set(), f"{fold_name}: sample val∩test"
+
+        all_test_patients.extend(fold_info["test_patients"])
+
+    # Every patient appears in TEST exactly once
+    counts = {}
+    for pid in all_test_patients:
+        counts[pid] = counts.get(pid, 0) + 1
+    multi = {p: c for p, c in counts.items() if c > 1}
+    assert not multi, f"Patients in test more than once: {multi}"
+
+    total = splits_data["n_patients"]
+    assert len(all_test_patients) == total, (
+        f"Not all patients covered in test: {len(all_test_patients)} entries for {total} patients"
+    )
+
+    print(
+        f"\n[PASS] 3-way partition verified across all 5 folds. "
+        f"{total} unique patients, each in TEST exactly once."
+    )
 
 
 if __name__ == "__main__":
